@@ -1,4 +1,4 @@
-import PaymentForm from 'A/components/PaymentForm';
+import PaymentForm from '@/components/PaymentForm';
 import { getClients } from '@/lib/actions';
 
 export default async function NewPaymentPage() {

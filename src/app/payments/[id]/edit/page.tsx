@@ -19,7 +19,5 @@ export default async function EditPaymentPage({ params }: { params: { id: string
         <PaymentForm payment={payment} clients={clients} isEditing />
       </div>
     </div>
-  
-  </div>
   );
 }

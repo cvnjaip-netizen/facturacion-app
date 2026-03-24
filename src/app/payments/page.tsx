@@ -101,7 +101,7 @@ export default function PaymentsPage() {
             {
               label: 'Confirmado',
               key: 'confirmado',
-              render: (item) => (item.confirmado ? "✓" : '-'),
+              render: (item) => (item.confirmado ? '✓' : '-'),
             },
           ]}
           data={payments}

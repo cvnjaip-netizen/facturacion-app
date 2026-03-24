@@ -114,7 +114,7 @@ export default function PaymentForm({ payment, clients, isEditing = false }: Pay
           name="formaPago"
           defaultValue={payment?.formaPago || ''}
           required
-          className="v-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
         >
           <option value="">Seleccionar forma de pago</option>
           <option value="Transferencia">Transferencia</option>
@@ -172,7 +172,7 @@ export default function PaymentForm({ payment, clients, isEditing = false }: Pay
           name="observaciones"
           defaultValue={payment?.observaciones || ''}
           rows={4}
-          className="v-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
         />
       </div>
 

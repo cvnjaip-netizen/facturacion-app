@@ -6,7 +6,7 @@ import {
   TopClientsBarChart,
   StatusPieChart,
   DebtBarChart,
-} from 'A/components/Charts';
+} from '@/components/Charts';
 import { DollarSign, Users, TrendingUp, AlertCircle, CheckCircle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
@@ -100,7 +100,5 @@ export default async function DashboardPage() {
         </div>
       </div>
     </div>
-  
-  </div>
   );
 }

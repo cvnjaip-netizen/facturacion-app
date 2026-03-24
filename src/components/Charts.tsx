@@ -135,7 +135,5 @@ export function DebtBarChart({ data }: { data: DebtData[] }) {
         </BarChart>
       </ResponsiveContainer>
     </div>
-  
-  </div>
   );
 }

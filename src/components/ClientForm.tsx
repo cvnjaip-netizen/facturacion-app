@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient, updateClient } from '@/lib/actions';
-import { Client } from 'A/lib/schema';
+import { Client } from '@/lib/schema';
 import Link from 'next/link';
 
 interface ClientFormProps {
@@ -146,7 +146,5 @@ export default function ClientForm({ client, isEditing = false }: ClientFormProp
         </button>
       </div>
     </form>
-  
-  </div>
   );
 }
