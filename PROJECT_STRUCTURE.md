@@ -125,7 +125,7 @@ CREATE TABLE payments (
 - Used for: Total Facturado, Total Cobrado, Saldo Pendiente, Clientes, % Cobrado
 
 ### DataTable (src/components/DataTable.tsx)
-- Generic reusable table with customizable columns
+- Gneric reusable table with customizable columns
 - Supports custom render functions
 - Optional actions column (edit/delete buttons)
 

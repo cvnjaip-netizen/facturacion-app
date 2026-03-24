@@ -3,8 +3,8 @@ import './globals.css';
 import Sidebar from '@/components/Sidebar';
 
 export const metadata: Metadata = {
-  title: 'Facturacion y Cobranzas',
-  description: 'Sistema de facturacion y cobranzas para firma contable venezolana',
+  title: 'Facturación y Cobranzas',
+  description: 'Sistema de facturación y cobranzas para firma contable venezolana',
 };
 
 export default function RootLayout({
