@@ -2,7 +2,7 @@
 
 import { db } from './db';
 import { clients, payments, type NewClient, type NewPayment, type Client, type Payment } from './schema';
-import { eq, like, and, isNull, not } from 'drizzle-orm';
+import { eq, like, and, isNull, not, type SQL } from 'drizzle-orm';
 import { parseNumeric } from './utils';
 
 // CLIENT ACTIONS
@@ -14,7 +14,7 @@ export async function getClients(
 ): Promise<Client[]> {
   let query = db.select().from(clients);
 
-  const filters: (typeof search | typeof sector | typeof estado)[] = [];
+  const filters: SQL[] = [];
 
   if (search) {
     filters.push(like(clients.nombre, `%${search}%`));
