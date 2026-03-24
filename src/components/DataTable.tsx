@@ -67,7 +67,5 @@ export default function DataTable<T extends { id?: number }>({
         </table>
       </div>
     </div>
-  
-  </div>
   );
 }

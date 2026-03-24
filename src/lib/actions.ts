@@ -49,7 +49,7 @@ export async function createClient(data: Partial<NewClient>): Promise<Client> {
     totalFacturado: data.totalFacturado || '0',
     totalCobrado: data.totalCobrado || '0',
     totalPendiente: data.totalPendiente || '0',
-    mesesActivos:' data.mesesActivos || 0,
+    mesesActivos: data.mesesActivos || 0,
     promedioMensual: data.promedioMensual || '0',
     pctCobrado: data.pctCobrado || '0',
     rif: data.rif || null,
@@ -67,7 +67,7 @@ export async function updateClient(id: number, data: Partial<NewClient>): Promis
       tipo: data.tipo,
       sector: data.sector,
       estado: data.estado,
-      totalFacturado: data.totalFacturado ,
+      totalFacturado: data.totalFacturado,
       totalCobrado: data.totalCobrado,
       totalPendiente: data.totalPendiente,
       mesesActivos: data.mesesActivos,
@@ -91,7 +91,7 @@ export async function deleteClient(id: number): Promise<void> {
 export async function getPayments(
   clientId?: number,
   search?: string
-)): Promise<(Payment & { clientName?: string })[]> {
+): Promise<(Payment & { clientName?: string })[]> {
   let query = db
     .select({
       id: payments.id,
@@ -102,7 +102,7 @@ export async function getPayments(
       banco: payments.banco,
       referencia: payments.referencia,
       confirmado: payments.confirmado,
-      observaciones
+      observaciones: payments.observaciones,
       createdAt: payments.createdAt,
       clientName: clients.nombre,
     })
@@ -140,7 +140,7 @@ export async function createPayment(data: Partial<NewPayment>): Promise<Payment>
     banco: data.banco || null,
     referencia: data.referencia || null,
     confirmado: data.confirmado || false,
-    observaciones
+    observaciones: data.observaciones || null,
   }).returning();
 
   return result[0];

@@ -54,7 +54,5 @@ export default function DeleteButton({ onConfirm, itemName = 'este elemento', lo
         </div>
       )}
     </>
-  
-  </div>
   );
 }
