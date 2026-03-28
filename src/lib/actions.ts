@@ -219,62 +219,6 @@ export async function getDashboardStats(
   if (search) {
     const s = search.toLowerCase();
     allC = allC.filter(c => c.nombre.toLowerCase().includes(s));
-  }acion: { nombre: string; monto: number };
-  mayorDeuda: { nombre: string; monto: number };
-  periodoMeses: number;
-  topClients: Array<{ rank: number; nombre: string; facturado: number; cobrado: number; pendiente: number; estado: string }>;
-  topDebtors: Array<{ rank: number; nombre: string; facturado: number; cobrado: number; deuda: number; pctCobrado: number }>;
-  sectorStats: SectorStat[];
-  clientStats: ClientRanked[];
-}
-
-// Generate monthly periods from 2018-04 to 2026-11
-function generatePeriods(): string[] {
-  const periods: string[] = [];
-  for (let y = 2018; y <= 2026; y++) {
-    const startM = y === 2018 ? 4 : 1;
-    const endM = y === 2026 ? 11 : 12;
-    for (let m = startM; m <= endM; m++) {
-      periods.push(`${y}-${String(m).padStart(2, '0')}`);
-    }
-  }
-  return periods;
-}
-
-const ALL_PERIODS = generatePeriods();
-
-// Get unique periods for the filter dropdown
-export function getAvailablePeriods(): string[] {
-  return ALL_PERIODS;
-}
-
-export async function getClientNames(): Promise<string[]> {
-  const all = await db.select({ nombre: clients.nombre }).from(clients);
-  return all.map(c => c.nombre).sort();
-}
-
-export async function getDashboardStats(
-  sector?: string,
-  search?: string,
-  periodFrom?: string,
-  periodTo?: string,
-): Promise<DashboardStats> {
-  const hasPeriodFilter = !!(periodFrom || periodTo);
-
-  // When period filter is active, compute stats from monthly data
-  if (hasPeriodFilter) {
-    return getDashboardStatsFromMonthly(sector, search, periodFrom, periodTo);
-  }
-
-  // No period filter — use pre-aggregated client table (original behavior)
-  let allC = await db.select().from(clients);
-
-  if (sector && sector !== 'all') {
-    allC = allC.filter(c => c.sector === sector);
-  }
-  if (search) {
-    const s = search.toLowerCase();
-    allC = allC.filter(c => c.nombre.toLowerCase().includes(s));
   }
 
   const totalFacturado = allC.reduce((s, c) => s + parseNumeric(c.totalFacturado), 0);
