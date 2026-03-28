@@ -188,7 +188,7 @@ function generatePeriods(): string[] {
 const ALL_PERIODS = generatePeriods();
 
 // Get unique periods for the filter dropdown
-export function getAvailablePeriods(): string[] {
+export async function getAvailablePeriods(): Promise<string[]> {
   return ALL_PERIODS;
 }
 
