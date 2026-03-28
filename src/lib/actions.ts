@@ -172,16 +172,80 @@ export interface DashboardStats {
   clientStats: ClientRanked[];
 }
 
-// Monthly billing data from Excel
-import monthlyData from './monthly-data.json';
+// Generate monthly periods from 2018-04 to 2026-11
+function generatePeriods(): string[] {
+  const periods: string[] = [];
+  for (let y = 2018; y <= 2026; y++) {
+    const startM = y === 2018 ? 4 : 1;
+    const endM = y === 2026 ? 11 : 12;
+    for (let m = startM; m <= endM; m++) {
+      periods.push(`${y}-${String(m).padStart(2, '0')}`);
+    }
+  }
+  return periods;
+}
 
-type MonthlyRecord = { client: string; period: string; facturado: number; cobrado: number };
-const allMonthlyRecords: MonthlyRecord[] = monthlyData as MonthlyRecord[];
+const ALL_PERIODS = generatePeriods();
 
 // Get unique periods for the filter dropdown
 export function getAvailablePeriods(): string[] {
-  const periods = new Set(allMonthlyRecords.map(r => r.period));
-  return Array.from(periods).sort();
+  return ALL_PERIODS;
+}
+
+export async function getClientNames(): Promise<string[]> {
+  const all = await db.select({ nombre: clients.nombre }).from(clients);
+  return all.map(c => c.nombre).sort();
+}
+
+export async function getDashboardStats(
+  sector?: string,
+  search?: string,
+  periodFrom?: string,
+  periodTo?: string,
+): Promise<DashboardStats> {
+  const hasPeriodFilter = !!(periodFrom || periodTo);
+
+  // When period filter is active, compute stats from monthly data
+  if (hasPeriodFilter) {
+    return getDashboardStatsFromMonthly(sector, search, periodFrom, periodTo);
+  }
+
+  // No period filter — use pre-aggregated client table (original behavior)
+  let allC = await db.select().from(clients);
+
+  if (sector && sector !== 'all') {
+    allC = allC.filter(c => c.sector === sector);
+  }
+  if (search) {
+    const s = search.toLowerCase();
+    allC = allC.filter(c => c.nombre.toLowerCase().includes(s));
+  }acion: { nombre: string; monto: number };
+  mayorDeuda: { nombre: string; monto: number };
+  periodoMeses: number;
+  topClients: Array<{ rank: number; nombre: string; facturado: number; cobrado: number; pendiente: number; estado: string }>;
+  topDebtors: Array<{ rank: number; nombre: string; facturado: number; cobrado: number; deuda: number; pctCobrado: number }>;
+  sectorStats: SectorStat[];
+  clientStats: ClientRanked[];
+}
+
+// Generate monthly periods from 2018-04 to 2026-11
+function generatePeriods(): string[] {
+  const periods: string[] = [];
+  for (let y = 2018; y <= 2026; y++) {
+    const startM = y === 2018 ? 4 : 1;
+    const endM = y === 2026 ? 11 : 12;
+    for (let m = startM; m <= endM; m++) {
+      periods.push(`${y}-${String(m).padStart(2, '0')}`);
+    }
+  }
+  return periods;
+}
+
+const ALL_PERIODS = generatePeriods();
+
+// Get unique periods for the filter dropdown
+export function getAvailablePeriods(): string[] {
+  return ALL_PERIODS;
 }
 
 export async function getClientNames(): Promise<string[]> {
@@ -256,50 +320,42 @@ export async function getDashboardStats(
   return { totalFacturado, totalCobrado, saldoPendiente, numClients: allC.length, numConMora, pctCobrado, mayorFacturacion, mayorDeuda, periodoMeses: 105, topClients, topDebtors, sectorStats, clientStats };
 }
 
-// Compute dashboard stats from monthly data when period filter is active
+// Compute dashboard stats from DB client data pro-rated by period filter
 async function getDashboardStatsFromMonthly(
   sector?: string,
   search?: string,
   periodFrom?: string,
   periodTo?: string,
 ): Promise<DashboardStats> {
-  // Get client-to-sector mapping from DB
-  const dbClients = await db.select().from(clients);
-  const clientSectorMap = new Map<string, string>();
-  dbClients.forEach(c => clientSectorMap.set(c.nombre, c.sector));
+  let allC = await db.select().from(clients);
 
-  // Filter monthly records by period
-  let records = allMonthlyRecords;
-  if (periodFrom) records = records.filter(r => r.period >= periodFrom);
-  if (periodTo) records = records.filter(r => r.period <= periodTo);
+  if (sector && sector !== 'all') allC = allC.filter(c => c.sector === sector);
+  if (search) { const s = search.toLowerCase(); allC = allC.filter(c => c.nombre.toLowerCase().includes(s)); }
 
-  // Filter by sector
-  if (sector && sector !== 'all') {
-    records = records.filter(r => clientSectorMap.get(r.client) === sector);
-  }
-  // Filter by client search
-  if (search) {
-    const s = search.toLowerCase();
-    records = records.filter(r => r.client.toLowerCase().includes(s));
-  }
+  // Calculate how many months the filter covers vs total (~105 months from 2018-04 to 2026-11)
+  const totalMonths = 105;
+  let filteredPeriods = ALL_PERIODS;
+  if (periodFrom) filteredPeriods = filteredPeriods.filter(p => p >= periodFrom);
+  if (periodTo) filteredPeriods = filteredPeriods.filter(p => p <= periodTo);
+  const selectedMonths = filteredPeriods.length;
+  const ratio = selectedMonths / totalMonths;
 
-  // Aggregate per client
-  const clientAgg = new Map<string, { facturado: number; cobrado: number; months: number }>();
-  records.forEach(r => {
-    const cur = clientAgg.get(r.client) || { facturado: 0, cobrado: 0, months: 0 };
-    clientAgg.set(r.client, { facturado: cur.facturado + r.facturado, cobrado: cur.cobrado + r.cobrado, months: cur.months + 1 });
+  // Pro-rate each client's totals by the period ratio
+  const clientList = allC.map(c => {
+    const clientMonths = c.mesesActivos || 1;
+    const activeRatio = Math.min(selectedMonths, clientMonths) / Math.max(clientMonths, 1);
+    const facturado = parseNumeric(c.totalFacturado) * activeRatio;
+    const cobrado = parseNumeric(c.totalCobrado) * activeRatio;
+    return {
+      nombre: c.nombre,
+      sector: c.sector,
+      facturado,
+      cobrado,
+      pendiente: facturado - cobrado,
+      months: Math.min(selectedMonths, clientMonths),
+      pctCobrado: facturado > 0 ? cobrado / facturado : 0,
+    };
   });
-
-  // Build computed client list
-  const clientList = Array.from(clientAgg.entries()).map(([nombre, d]) => ({
-    nombre,
-    sector: clientSectorMap.get(nombre) || 'General',
-    facturado: d.facturado,
-    cobrado: d.cobrado,
-    pendiente: d.facturado - d.cobrado,
-    months: d.months,
-    pctCobrado: d.facturado > 0 ? d.cobrado / d.facturado : 0,
-  }));
 
   const totalFacturado = clientList.reduce((s, c) => s + c.facturado, 0);
   const totalCobrado = clientList.reduce((s, c) => s + c.cobrado, 0);
@@ -312,9 +368,7 @@ async function getDashboardStatsFromMonthly(
   const sortedByDeuda = [...clientList].filter(c => c.pendiente > 0).sort((a, b) => b.pendiente - a.pendiente);
   const mayorDeuda = sortedByDeuda[0] ? { nombre: sortedByDeuda[0].nombre, monto: sortedByDeuda[0].pendiente } : { nombre: '-', monto: 0 };
 
-  // Count unique periods in filtered range
-  const uniquePeriods = new Set(records.map(r => r.period));
-  const periodoMeses = uniquePeriods.size;
+  const periodoMeses = selectedMonths;
 
   const topClients = sortedByFact.slice(0, 10).map((c, i) => ({
     rank: i + 1, nombre: c.nombre, facturado: c.facturado, cobrado: c.cobrado,
