@@ -1,4 +1,6 @@
-import { getDashboardStats } from '@/lib/actions';
+import { getDashboardStats, getClientNames, getAvailablePeriods } from '@/lib/actions';
+import DashboardFilters from '@/components/DashboardFilters';
+import { Suspense } from 'react';
 
 function fmtBs(n: number): string {
   return 'Bs. ' + Math.round(n).toLocaleString('es-VE');
@@ -8,8 +10,22 @@ function fmtPct(n: number): string {
   return (n * 100).toFixed(1) + '%';
 }
 
-export default async function DashboardPage() {
-  const stats = await getDashboardStats();
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { sector?: string; search?: string; from?: string; to?: string };
+}) {
+  const sector = searchParams?.sector || undefined;
+  const search = searchParams?.search || undefined;
+  const periodFrom = searchParams?.from || undefined;
+  const periodTo = searchParams?.to || undefined;
+  const [stats, clientNames] = await Promise.all([
+    getDashboardStats(sector, search, periodFrom, periodTo),
+    getClientNames(),
+  ]);
+  const periods = getAvailablePeriods();
+
+  const isFiltered = !!(sector || search || periodFrom || periodTo);
 
   return (
     <div className="p-6 max-w-[1400px] mx-auto space-y-6">
@@ -22,6 +38,17 @@ export default async function DashboardPage() {
           Resumen ejecutivo de facturacion y cobranzas | Periodo 2018 - 2026 | Todos los importes en Bolivares (Bs.)
         </p>
       </div>
+
+      {/* Filters */}
+      <Suspense fallback={null}>
+        <DashboardFilters clientNames={clientNames} periods={periods} />
+      </Suspense>
+
+      {isFiltered && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-sm text-blue-700">
+          Filtros activos: {periodFrom || periodTo ? `Periodo: ${periodFrom || 'inicio'} a ${periodTo || 'fin'}` : ''}{(periodFrom || periodTo) && (sector || search) ? ' | ' : ''}{sector && sector !== 'all' ? `Sector: ${sector}` : ''}{sector && search ? ' | ' : ''}{search ? `Cliente: "${search}"` : ''} — {stats.numClients} cliente{stats.numClients !== 1 ? 's' : ''}, {stats.periodoMeses} meses
+        </div>
+      )}
 
       {/* KPI Row 1 */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
