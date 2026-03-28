@@ -23,7 +23,7 @@ export default async function DashboardPage({
     getDashboardStats(sector, search, periodFrom, periodTo),
     getClientNames(),
   ]);
-  const periods = getAvailablePeriods();
+  const periods = await getAvailablePeriods();
 
   const isFiltered = !!(sector || search || periodFrom || periodTo);
 
