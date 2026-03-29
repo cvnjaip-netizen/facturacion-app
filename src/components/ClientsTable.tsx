@@ -1,45 +1,49 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Users, CheckCircle, AlertTriangle, TrendingUp, UserPlus,
-  Download, Upload, Search, ChevronUp, ChevronDown, ChevronsUpDown,
-  Filter, X,
+  Download, Upload, Search, ChevronUp, ChevronDown,
+  ChevronsUpDown, Filter, X, Calendar,
 } from 'lucide-react';
 
 interface ClientRanked {
-  rank: number;
-  nombre: string;
-  sector: string;
-  totalFacturado: number;
-  totalCobrado: number;
-  totalPendiente: number;
-  mesesActivos: number;
-  ultimoPago: string;
-  promedioMensual: number;
-  pctCobrado: number;
-  estadoCuenta: string;
-  rankingCobranza: string;
+  rank: number; nombre: string; sector: string;
+  totalFacturado: number; totalCobrado: number; totalPendiente: number;
+  mesesActivos: number; ultimoPago: string; promedioMensual: number;
+  pctCobrado: number; estadoCuenta: string; rankingCobranza: string;
 }
 
-function fmtBs(n: number): string {
-  return 'Bs. ' + Math.round(n).toLocaleString('es-VE');
+interface Props {
+  clients: ClientRanked[];
+  periods?: string[];
+  periodFrom?: string;
+  periodTo?: string;
 }
-function fmtPct(n: number): string {
-  return (n * 100).toFixed(1) + '%';
+
+function fmtBs(n: number): string { return 'Bs. ' + Math.round(n).toLocaleString('es-VE'); }
+function fmtPct(n: number): string { return (n * 100).toFixed(1) + '%'; }
+function fmtPeriod(p: string): string {
+  const [y, m] = p.split('-');
+  const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  return months[parseInt(m) - 1] + ' ' + y;
 }
 
 type SortKey = 'nombre' | 'sector' | 'totalFacturado' | 'totalCobrado' | 'totalPendiente' | 'pctCobrado' | 'estadoCuenta';
 type SortDir = 'asc' | 'desc';
 
-export default function ClientsTable({ clients }: { clients: ClientRanked[] }) {
+export default function ClientsTable({ clients, periods = [], periodFrom, periodTo }: Props) {
+  const router = useRouter();
+  const searchParamsHook = useSearchParams();
+
   const [search, setSearch] = useState('');
   const [sectorFilter, setSectorFilter] = useState('all');
   const [estadoFilter, setEstadoFilter] = useState('all');
   const [sortKey, setSortKey] = useState<SortKey>('totalFacturado');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [page, setPage] = useState(1);
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(!!(periodFrom || periodTo));
   const perPage = 15;
 
   const sectors = useMemo(() => {
@@ -47,13 +51,30 @@ export default function ClientsTable({ clients }: { clients: ClientRanked[] }) {
     return Array.from(s).sort();
   }, [clients]);
 
+  // Period change triggers server re-fetch via URL
+  const handlePeriodChange = (key: 'periodFrom' | 'periodTo', value: string) => {
+    const params = new URLSearchParams(searchParamsHook.toString());
+    if (value && value !== 'all') {
+      params.set(key, value);
+    } else {
+      params.delete(key);
+    }
+    router.push(`/clients?${params.toString()}`);
+  };
+
+  const clearPeriod = () => {
+    const params = new URLSearchParams(searchParamsHook.toString());
+    params.delete('periodFrom');
+    params.delete('periodTo');
+    router.push(`/clients?${params.toString()}`);
+  };
+
   const filtered = useMemo(() => {
     let result = [...clients];
     if (search) {
       const s = search.toLowerCase();
       result = result.filter(c =>
-        c.nombre.toLowerCase().includes(s) ||
-        c.sector.toLowerCase().includes(s)
+        c.nombre.toLowerCase().includes(s) || c.sector.toLowerCase().includes(s)
       );
     }
     if (sectorFilter !== 'all') {
@@ -75,9 +96,10 @@ export default function ClientsTable({ clients }: { clients: ClientRanked[] }) {
       let va: number | string = a[sortKey];
       let vb: number | string = b[sortKey];
       if (typeof va === 'string') {
-        va = va.toLowerCase();
-        vb = (vb as string).toLowerCase();
-        return sortDir === 'asc' ? (va < vb ? -1 : va > vb ? 1 : 0) : (va > vb ? -1 : va < vb ? 1 : 0);
+        va = va.toLowerCase(); vb = (vb as string).toLowerCase();
+        return sortDir === 'asc'
+          ? (va < vb ? -1 : va > vb ? 1 : 0)
+          : (va > vb ? -1 : va < vb ? 1 : 0);
       }
       return sortDir === 'asc' ? (va as number) - (vb as number) : (vb as number) - (va as number);
     });
@@ -104,13 +126,12 @@ export default function ClientsTable({ clients }: { clients: ClientRanked[] }) {
       : <ChevronDown className="w-3 h-3 ml-1 inline text-emerald-600" />;
   };
 
-  // KPIs
   const totalClientes = clients.length;
   const activos = clients.filter(c => c.mesesActivos > 0).length;
   const conMora = clients.filter(c => c.totalPendiente > 0).length;
   const prepagados = clients.filter(c => c.estadoCuenta === 'Prepagado').length;
-
-  const activeFilterCount = (sectorFilter !== 'all' ? 1 : 0) + (estadoFilter !== 'all' ? 1 : 0);
+  const activeFilterCount = (sectorFilter !== 'all' ? 1 : 0) + (estadoFilter !== 'all' ? 1 : 0) + (periodFrom ? 1 : 0) + (periodTo ? 1 : 0);
+  const hasPeriod = !!(periodFrom || periodTo);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 pt-16 lg:pt-8">
@@ -120,7 +141,15 @@ export default function ClientsTable({ clients }: { clients: ClientRanked[] }) {
         <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">Gestion de Clientes</h1>
-            <p className="text-emerald-200 mt-1 text-sm">Consulta y administra la cartera de clientes</p>
+            <p className="text-emerald-200 mt-1 text-sm">
+              Consulta y administra la cartera de clientes
+              {hasPeriod && (
+                <span className="ml-2 inline-flex items-center gap-1 bg-white/20 rounded-full px-2.5 py-0.5 text-[11px] font-medium">
+                  <Calendar className="w-3 h-3" />
+                  {periodFrom ? fmtPeriod(periodFrom) : 'Inicio'} — {periodTo ? fmtPeriod(periodTo) : 'Fin'}
+                </span>
+              )}
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <button className="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2 text-sm font-medium transition-colors border border-white/10">
@@ -184,16 +213,12 @@ export default function ClientsTable({ clients }: { clients: ClientRanked[] }) {
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={e => { setSearch(e.target.value); setPage(1); }}
+            <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
               placeholder="Buscar cliente o RIF..."
               className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all"
             />
           </div>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
+          <button onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl transition-colors border ${
               showFilters || activeFilterCount > 0
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -209,37 +234,79 @@ export default function ClientsTable({ clients }: { clients: ClientRanked[] }) {
         </div>
 
         {showFilters && (
-          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-100">
-            <div className="flex items-center gap-2">
-              <label className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Sector</label>
-              <select
-                value={sectorFilter}
-                onChange={e => { setSectorFilter(e.target.value); setPage(1); }}
-                className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400"
-              >
-                <option value="all">Todos</option>
-                {sectors.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+          <div className="flex flex-col gap-3 pt-2 border-t border-slate-100">
+            {/* Row 1: Servicio + Estado */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <label className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Servicio</label>
+                <select value={sectorFilter} onChange={e => { setSectorFilter(e.target.value); setPage(1); }}
+                  className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400"
+                >
+                  <option value="all">Todos</option>
+                  {sectors.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Estado</label>
+                <select value={estadoFilter} onChange={e => { setEstadoFilter(e.target.value); setPage(1); }}
+                  className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400"
+                >
+                  <option value="all">Todos</option>
+                  <option value="Pendiente">Pendiente</option>
+                  <option value="Prepagado">Prepagado</option>
+                </select>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <label className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Estado</label>
-              <select
-                value={estadoFilter}
-                onChange={e => { setEstadoFilter(e.target.value); setPage(1); }}
-                className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400"
-              >
-                <option value="all">Todos</option>
-                <option value="Pendiente">Pendiente</option>
-                <option value="Prepagado">Prepagado</option>
-              </select>
+
+            {/* Row 2: Period From / To */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <label className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold flex items-center gap-1">
+                  <Calendar className="w-3 h-3" /> Periodo Desde
+                </label>
+                <select
+                  value={periodFrom || 'all'}
+                  onChange={e => handlePeriodChange('periodFrom', e.target.value === 'all' ? '' : e.target.value)}
+                  className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400"
+                >
+                  <option value="all">Inicio</option>
+                  {periods.map(p => <option key={p} value={p}>{fmtPeriod(p)}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold flex items-center gap-1">
+                  Hasta
+                </label>
+                <select
+                  value={periodTo || 'all'}
+                  onChange={e => handlePeriodChange('periodTo', e.target.value === 'all' ? '' : e.target.value)}
+                  className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400"
+                >
+                  <option value="all">Fin</option>
+                  {periods.map(p => <option key={p} value={p}>{fmtPeriod(p)}</option>)}
+                </select>
+              </div>
+              {hasPeriod && (
+                <button onClick={clearPeriod}
+                  className="flex items-center gap-1 text-[11px] text-amber-600 hover:text-amber-700 font-medium bg-amber-50 px-2 py-1 rounded-md border border-amber-200"
+                >
+                  <X className="w-3 h-3" /> Limpiar periodo
+                </button>
+              )}
             </div>
+
+            {/* Clear all */}
             {activeFilterCount > 0 && (
-              <button
-                onClick={() => { setSectorFilter('all'); setEstadoFilter('all'); setPage(1); }}
-                className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700 font-medium ml-auto"
-              >
-                <X className="w-3 h-3" /> Limpiar filtros
-              </button>
+              <div className="flex justify-end">
+                <button onClick={() => {
+                  setSectorFilter('all'); setEstadoFilter('all'); setPage(1);
+                  if (hasPeriod) clearPeriod();
+                }}
+                  className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700 font-medium"
+                >
+                  <X className="w-3 h-3" /> Limpiar todos los filtros
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -263,7 +330,7 @@ export default function ClientsTable({ clients }: { clients: ClientRanked[] }) {
                   Cliente<SortIcon col="nombre" />
                 </th>
                 <th className="px-4 py-3 font-semibold cursor-pointer hover:text-emerald-700 transition-colors select-none" onClick={() => handleSort('sector')}>
-                  Sector<SortIcon col="sector" />
+                  Servicio<SortIcon col="sector" />
                 </th>
                 <th className="px-4 py-3 text-right font-semibold cursor-pointer hover:text-emerald-700 transition-colors select-none" onClick={() => handleSort('totalFacturado')}>
                   Facturado<SortIcon col="totalFacturado" />
@@ -319,43 +386,26 @@ export default function ClientsTable({ clients }: { clients: ClientRanked[] }) {
           <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-between">
             <p className="text-xs text-slate-500">Mostrando {(page-1)*perPage+1}–{Math.min(page*perPage, sorted.length)} de {sorted.length}</p>
             <div className="flex items-center gap-1">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                &lt;
-              </button>
+              >&lt;</button>
               {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
                 let p: number;
-                if (totalPages <= 7) {
-                  p = i + 1;
-                } else if (page <= 4) {
-                  p = i + 1;
-                } else if (page >= totalPages - 3) {
-                  p = totalPages - 6 + i;
-                } else {
-                  p = page - 3 + i;
-                }
+                if (totalPages <= 7) { p = i + 1; }
+                else if (page <= 4) { p = i + 1; }
+                else if (page >= totalPages - 3) { p = totalPages - 6 + i; }
+                else { p = page - 3 + i; }
                 return (
-                  <button
-                    key={p}
-                    onClick={() => setPage(p)}
+                  <button key={p} onClick={() => setPage(p)}
                     className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-medium transition-colors ${
                       p === page ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100'
                     }`}
-                  >
-                    {p}
-                  </button>
+                  >{p}</button>
                 );
               })}
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                &gt;
-              </button>
+              >&gt;</button>
             </div>
           </div>
         )}
